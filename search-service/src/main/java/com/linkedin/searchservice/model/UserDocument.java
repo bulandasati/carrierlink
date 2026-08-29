@@ -16,7 +16,7 @@ import java.util.List;
  * Enables full text search across name, headline, skills, location.
  */
 
-@Document(indexName = "users")
+@Document(indexName = "users", createIndex = false)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

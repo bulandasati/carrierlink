@@ -14,7 +14,7 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
  * Enables full text search across post content.
  */
 
-@Document(indexName = "posts")
+@Document(indexName = "posts", createIndex = false)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
