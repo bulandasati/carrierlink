@@ -31,26 +31,23 @@ public class NotificationService {
      * Consume user.created event
      * Send Welcome notification
      */
-
     @KafkaListener(topics = "user.created")
-    public void consumeUserCreated(
-            @Payload Map<String, Object> payload){
-
-        try{
+    public void consumeUserCreated(@Payload Map<String, Object> payload) {
+        try {
             String userId = (String) payload.get("userId");
             String firstName = (String) payload.get("firstName");
+            String email = (String) payload.get("email");
 
-            sendNotification(userId,
-                    "Welcome to LinkedIn!",
-                    String.format(
-                            "Welcome %s! Your account has been created " +
-                            "Start connecting with professionals.",
-                            firstName
-                    ));
-        }
-        catch (Exception e){
-            log.error("Error sending welcome notification: {}",
-                    e.getMessage());
+            log.info("Received user.created event for userId: {}, email: {}", userId, email);
+
+            sendNotificationWithEmail(
+                    userId,
+                    email,
+                    "Welcome to CarrierLink!",
+                    String.format("Welcome %s! Your CarrierLink account has been successfully created. Start connecting with professionals today!", firstName != null ? firstName : "there")
+            );
+        } catch (Exception e) {
+            log.error("Error sending welcome notification: {}", e.getMessage(), e);
         }
     }
 
@@ -58,21 +55,20 @@ public class NotificationService {
      * Consume connection.requested event
      * Notify receiver about connection request.
      */
-
     @KafkaListener(topics = "connection.requested")
-    public void consumeConnectionRequest(
-            @Payload Map<String, Object> payload){
-        try{
+    public void consumeConnectionRequest(@Payload Map<String, Object> payload) {
+        try {
             String receiverId = (String) payload.get("receiverId");
             String requesterId = (String) payload.get("requesterId");
             String requesterName = getUserFullName(requesterId);
 
-            sendNotification(receiverId,
+            sendNotification(
+                    receiverId,
                     "New Connection Request",
-                    String.format("%s wants to connect with you.", requesterName));
-        }
-        catch (Exception e){
-            log.error("Error sending connection request notification: {}", e.getMessage());
+                    String.format("%s wants to connect with you on CarrierLink.", requesterName)
+            );
+        } catch (Exception e) {
+            log.error("Error sending connection request notification: {}", e.getMessage(), e);
         }
     }
 
@@ -80,62 +76,46 @@ public class NotificationService {
      * Consume connection.accepted event.
      * Notify requester that connection was accepted
      */
-
     @KafkaListener(topics = "connection.accepted")
-    public void consumeConnectionAccepted(
-            @Payload Map<String, Object> payload){
-
-        try{
+    public void consumeConnectionAccepted(@Payload Map<String, Object> payload) {
+        try {
             String receiverId = (String) payload.get("receiverId");
             String requesterId = (String) payload.get("requesterId");
             String receiverName = getUserFullName(receiverId);
 
-            sendNotification(requesterId,
+            sendNotification(
+                    requesterId,
                     "Connection Accepted",
-                    String.format("%s accepted your connection request. You are now connected!", receiverName));
-        }
-        catch (Exception e){
-            log.error("Error sending connection accepted notification: {}", e.getMessage());
+                    String.format("%s accepted your connection request. You are now connected on CarrierLink!", receiverName)
+            );
+        } catch (Exception e) {
+            log.error("Error sending connection accepted notification: {}", e.getMessage(), e);
         }
     }
 
+    /**
+     * Consume post.liked event
+     */
     @KafkaListener(topics = "post.liked")
-    public void consumePostLiked(
-            @Payload Map<String, Object> payload){
-        try{
+    public void consumePostLiked(@Payload Map<String, Object> payload) {
+        try {
             String authorId = (String) payload.get("authorId");
             String userId = (String) payload.get("userId");
             String likerName = getUserFullName(userId);
 
-            sendNotification(authorId,
+            sendNotification(
+                    authorId,
                     "Someone liked your post",
-                    String.format("%s liked your post.", likerName));
-        }
-        catch (Exception e){
-            log.error("Error sending like notification: {}", e.getMessage());
-        }
-    }
-
-    @KafkaListener(topics = "post.commented")
-    public void consumePostCommented(
-            @Payload Map<String, Object> payload){
-        try{
-            String postAuthorId = (String) payload.get("postAuthorId");
-            String commenterId = (String) payload.get("authorId");
-            String commenterName = getUserFullName(commenterId);
-
-            sendNotification(postAuthorId,
-                    "New comment on your post",
-                    String.format("%s commented on your post.", commenterName));
-        }
-        catch (Exception e){
-            log.error("Error sending comment notification: {}", e.getMessage());
+                    String.format("%s liked your post on CarrierLink.", likerName)
+            );
+        } catch (Exception e) {
+            log.error("Error sending like notification: {}", e.getMessage(), e);
         }
     }
 
     private String getUserFullName(String userId) {
         if (userId == null || userId.isBlank()) {
-            return "A LinkedIn member";
+            return "A CarrierLink member";
         }
         try {
             UserDto user = userClient.getUserById(userId);
@@ -150,39 +130,16 @@ public class NotificationService {
         } catch (Exception e) {
             log.warn("Failed to fetch user name for {}: {}", userId, e.getMessage());
         }
-        return "A LinkedIn member";
+        return "A CarrierLink member";
     }
 
-    private void sendNotification(String userId,
-                                  String title,
-                                  String message){
-
-        log.info("------------------------------------------");
-        log.info("NOTIFICATION TRIGGERED");
-        log.info("To User: {}", userId);
-        log.info("Title: {}", title);
-        log.info("Message: {}", message);
-        log.info("------------------------------------------");
-
+    private void sendNotification(String userId, String title, String message) {
         if (userId == null || userId.isBlank()) return;
 
         try {
             UserDto user = userClient.getUserById(userId);
             if (user != null && user.getEmail() != null && !user.getEmail().isBlank()) {
-                log.info("Fetched recipient email for {}: {}", userId, user.getEmail());
-
-                if (mailSender != null) {
-                    SimpleMailMessage mailMessage = new SimpleMailMessage();
-                    mailMessage.setFrom(mailFrom);
-                    mailMessage.setTo(user.getEmail());
-                    mailMessage.setSubject(title);
-                    mailMessage.setText(message);
-
-                    mailSender.send(mailMessage);
-                    log.info("EMAIL SUCCESSFULLY SENT via SMTP to {}", user.getEmail());
-                } else {
-                    log.warn("JavaMailSender bean is not active. Logged notification for {}", user.getEmail());
-                }
+                sendNotificationWithEmail(userId, user.getEmail(), title, message);
             } else {
                 log.warn("Could not find valid user/email for userId: {}", userId);
             }
@@ -191,30 +148,34 @@ public class NotificationService {
         }
     }
 
+    private void sendNotificationWithEmail(String userId, String email, String title, String message) {
+        log.info("------------------------------------------");
+        log.info("NOTIFICATION TRIGGERED");
+        log.info("To User: {} ({})", userId, email);
+        log.info("Title: {}", title);
+        log.info("Message: {}", message);
+        log.info("------------------------------------------");
 
+        if (email == null || email.isBlank()) {
+            log.warn("Recipient email is empty, skipping email dispatch");
+            return;
+        }
 
+        if (mailSender != null) {
+            try {
+                SimpleMailMessage mailMessage = new SimpleMailMessage();
+                mailMessage.setFrom(mailFrom);
+                mailMessage.setTo(email);
+                mailMessage.setSubject(title);
+                mailMessage.setText(message);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+                mailSender.send(mailMessage);
+                log.info("EMAIL SUCCESSFULLY SENT via SMTP to {}", email);
+            } catch (Exception e) {
+                log.error("SMTP error sending email to {}: {}", email, e.getMessage(), e);
+            }
+        } else {
+            log.warn("JavaMailSender bean is not active. Logged notification for {}", email);
+        }
+    }
 }
