@@ -26,6 +26,8 @@ spring:
         security.protocol: ${KAFKA_SECURITY_PROTOCOL:SASL_SSL}
         sasl.mechanism: ${KAFKA_SASL_MECHANISM:SCRAM-SHA-256}
         sasl.jaas.config: ${KAFKA_SASL_JAAS_CONFIG}
+        ssl.truststore.type: PEM
+        ssl.truststore.certificates: ${KAFKA_CA_CERTIFICATE}
 
 user-service:
   url: ${USER_SERVICE_URL}
