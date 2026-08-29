@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: api-gateway
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD}
+      ssl:
+        enabled: ${SPRING_DATA_REDIS_SSL_ENABLED:true}
+  cloud:
+    gateway:
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+      routes:
+
+        # Auth routes - NO JWT validation required
+        - id: user-service-auth
+          uri: ${USER_SERVICE_URL}
+          predicates:
+            - Path=/api/v1/auth/**
+
+        # User Service routes - JWT Required
+        - id: user-service
+          uri: ${USER_SERVICE_URL}
+          predicates:
+            - Path=/api/v1/users/**
+          filters:
+            - name: JwtAuthFilter
+
+        # Post Service routes - JWT validation required
+        - id: post-service
+          uri: ${POST_SERVICE_URL}
+          predicates:
+            - Path=/api/v1/posts/**
+          filters:
+            - name: JwtAuthFilter
+
+        # Feed Service routes - JWT validation required
+        - id: feed-service
+          uri: ${FEED_SERVICE_URL}
+          predicates:
+            - Path=/api/v1/feed/**
+          filters:
+            - name: JwtAuthFilter
+
+        # Search Service routes - JWT validation required
+        - id: search-service
+          uri: ${SEARCH_SERVICE_URL}
+          predicates:
+            - Path=/api/v1/search/**
+          filters:
+            - name: JwtAuthFilter
+
+server:
+  port: ${PORT:8080}
+
+jwt:
+  secret-key: ${JWT_SECRET}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

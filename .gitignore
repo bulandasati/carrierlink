@@ -1,0 +1,31 @@
+# Credentials Reference
+RENDER_ENVIRONMENT_VARIABLES.md
+*.env
+*.env.local
+
+# Maven build artifacts
+**/target/
+*.jar
+*.war
+*.class
+
+# Node / Frontend artifacts
+**/node_modules/
+**/dist/
+**/build/
+.npm
+.yarn
+
+# IDE and Editors
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.settings/
+.project
+.classpath
+
+# OS generated files
+.DS_Store
+Thumbs.db
