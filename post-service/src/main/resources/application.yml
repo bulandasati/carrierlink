@@ -20,10 +20,8 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     properties:
       security.protocol: ${KAFKA_SECURITY_PROTOCOL:SASL_SSL}
-      sasl.mechanism: ${KAFKA_SASL_MECHANISM:SCRAM-SHA-256}
+      sasl.mechanism: ${KAFKA_SASL_MECHANISM:PLAIN}
       sasl.jaas.config: ${KAFKA_SASL_JAAS_CONFIG}
-      ssl.truststore.type: PEM
-      ssl.truststore.certificates: ${KAFKA_CA_CERTIFICATE}
 
 server:
   port: ${PORT:8082}

@@ -2,27 +2,20 @@ spring:
   application:
     name: notification-service
   mail:
-    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
-    port: ${SPRING_MAIL_PORT:465}
+    host: ${SPRING_MAIL_HOST:smtp-relay.brevo.com}
+    port: ${SPRING_MAIL_PORT:587}
     username: ${SPRING_MAIL_USERNAME}
     password: ${SPRING_MAIL_PASSWORD}
-    protocol: smtps
     properties:
       mail:
         smtp:
           auth: true
-          ssl:
-            enable: true
-            trust: "*"
           starttls:
-            enable: false
+            enable: true
+            required: true
           connectiontimeout: 10000
           timeout: 10000
           writetimeout: 10000
-          socketFactory:
-            port: 465
-            class: javax.net.ssl.SSLSocketFactory
-            fallback: false
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
     consumer:
@@ -35,10 +28,8 @@ spring:
         spring.json.use.type.headers: false
         spring.json.value.default.type: java.util.HashMap
         security.protocol: ${KAFKA_SECURITY_PROTOCOL:SASL_SSL}
-        sasl.mechanism: ${KAFKA_SASL_MECHANISM:SCRAM-SHA-256}
+        sasl.mechanism: ${KAFKA_SASL_MECHANISM:PLAIN}
         sasl.jaas.config: ${KAFKA_SASL_JAAS_CONFIG}
-        ssl.truststore.type: PEM
-        ssl.truststore.certificates: ${KAFKA_CA_CERTIFICATE}
 
 user-service:
   url: ${USER_SERVICE_URL}

@@ -28,50 +28,59 @@ public class FeedEventConsumer {
     private int maxFeedSize;
 
     /**
-     * Consume post.created event
-     * When a user creates a post - immediately push that post
-     * to All thier connections feed.
+     * Consume post.created event.
      *
-     * This is how LinkedIn/ Twitter generated feed.
-     * @param payload
+     * Fan-out on write: when a user creates a post, immediately push
+     * that postId into every connection's feed using a Redis Sorted Set
+     * scored by the post's creation timestamp. This guarantees chronological
+     * ordering even when Kafka delivers events out of order, and is idempotent
+     * — re-processing the same event simply overwrites the score.
+     *
+     * Redis command issued per connection:
+     *   ZADD feed:<userId> <timestamp_millis> <postId>
+     *   ZREMRANGEBYRANK feed:<userId> 0 <(total - maxFeedSize - 1)>
+     *
+     * This is how LinkedIn / Twitter (X) generates personalised feeds.
      */
     @KafkaListener(topics = "post.created")
     public void consumePostCreated(
-            @Payload Map<String, Object> payload){
+            @Payload Map<String, Object> payload) {
 
-        try{
+        try {
             String postId = (String) payload.get("postId");
             String authorId = (String) payload.get("authorId");
 
-            // Get all connections of the post author
-            List<Map<String , Object>> connections =
-                    userServiceClient.getConnections(authorId);
-
-            // Push post to each connection's feed.
-            for (Map<String, Object> connection : connections){
-                String connectionId = (String) connection.get("id");
-                String feedKey = FEED_KEY_PREFIX + connectionId;
-
-                // Add post to feed (as sorted set - score = timestamp)
-                redisTemplate.opsForList()
-                        .leftPush(feedKey, postId);
-
-                redisTemplate.opsForList()
-                        .trim(feedKey, 0, maxFeedSize-1);
-
-                log.info("Post {} pushed to feed of user: {}",
-                        postId, connectionId);
+            // Use post createdAt timestamp as the ZSet score for chronological ordering.
+            double score = System.currentTimeMillis();
+            Object rawCreatedAt = payload.get("createdAt");
+            if (rawCreatedAt != null) {
+                try {
+                    score = Double.parseDouble(rawCreatedAt.toString());
+                } catch (NumberFormatException ignored) {
+                    try {
+                        java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(rawCreatedAt.toString());
+                        score = (double) ldt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                    } catch (Exception e) {
+                        score = System.currentTimeMillis();
+                    }
+                }
             }
 
-            String authorFeedKey = FEED_KEY_PREFIX + authorId;
-            redisTemplate.opsForList()
-                    .leftPush(authorFeedKey, postId);
-            redisTemplate.opsForList()
-                    .trim(authorFeedKey, 0, maxFeedSize - 1);
+            // Get all connections of the post author
+            List<Map<String, Object>> connections =
+                    userServiceClient.getConnections(authorId);
 
-        }
-        catch (Exception e){
-            log.error("Error in pushing: {}", e.getMessage());
+            // Fan-out: push postId to each connection's sorted-set feed
+            for (Map<String, Object> connection : connections) {
+                String connectionId = (String) connection.get("id");
+                pushToFeed(connectionId, postId, score);
+            }
+
+            // Also push to the author's own feed
+            pushToFeed(authorId, postId, score);
+
+        } catch (Exception e) {
+            log.error("Error in consumePostCreated: {}", e.getMessage());
         }
     }
 
@@ -95,38 +104,55 @@ public class FeedEventConsumer {
         }
     }
 
+    /**
+     * Add a postId to a user's feed sorted set and enforce the max-size cap.
+     *
+     * ZADD is idempotent: re-adding the same postId just updates its score,
+     * preventing duplicates if Kafka retries the same event.
+     *
+     * ZREMRANGEBYRANK trims the set from the low-score end (oldest posts)
+     * keeping memory usage bounded at maxFeedSize entries per user.
+     */
+    private void pushToFeed(String userId, String postId, double score) {
+        String feedKey = FEED_KEY_PREFIX + userId;
+
+        // ZADD feed:<userId> <score> <postId>
+        redisTemplate.opsForZSet().add(feedKey, postId, score);
+
+        // Enforce cap: remove oldest entries beyond maxFeedSize
+        Long total = redisTemplate.opsForZSet().zCard(feedKey);
+        if (total != null && total > maxFeedSize) {
+            // ZREMRANGEBYRANK feed:<userId> 0 <overflow_count - 1>
+            redisTemplate.opsForZSet().removeRange(feedKey, 0, total - maxFeedSize - 1);
+        }
+
+        log.info("Post {} pushed to feed of user: {} (score={})", postId, userId, score);
+    }
+
+    /**
+     * Backfill up to 10 recent posts from sourceAuthorId into targetUserFeedId's feed.
+     * Triggered when two users first connect — seeds their feeds with each other's content.
+     */
     private void backfillRecentPosts(String sourceAuthorId, String targetUserFeedId) {
         if (sourceAuthorId == null || targetUserFeedId == null) return;
         try {
             List<Map<String, Object>> posts = postServiceClient.getUserPosts(sourceAuthorId);
             if (posts != null && !posts.isEmpty()) {
-                String feedKey = FEED_KEY_PREFIX + targetUserFeedId;
-                // Take up to 10 recent posts
                 int limit = Math.min(posts.size(), 10);
+                // Posts arrive newest-first; iterate oldest-to-newest so scores are ascending
                 for (int i = limit - 1; i >= 0; i--) {
                     String postId = (String) posts.get(i).get("id");
                     if (postId != null) {
-                        redisTemplate.opsForList().leftPush(feedKey, postId);
+                        // Use millis offset to preserve relative ordering during backfill
+                        double score = System.currentTimeMillis() - ((long) (limit - 1 - i) * 1000L);
+                        pushToFeed(targetUserFeedId, postId, score);
                     }
                 }
-                redisTemplate.opsForList().trim(feedKey, 0, maxFeedSize - 1);
-                log.info("Backfilled {} recent posts of user {} to feed of user {}", limit, sourceAuthorId, targetUserFeedId);
+                log.info("Backfilled {} recent posts of user {} to feed of user {}",
+                        limit, sourceAuthorId, targetUserFeedId);
             }
         } catch (Exception e) {
             log.warn("Failed to backfill posts of {} to {}: {}", sourceAuthorId, targetUserFeedId, e.getMessage());
         }
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
 }
