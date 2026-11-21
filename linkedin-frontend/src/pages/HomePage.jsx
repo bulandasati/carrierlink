@@ -40,14 +40,14 @@ export default function HomePage() {
       if (postIds.length > 0) {
         // Fetch each post details
         const postPromises = postIds.map(id =>
-          api.get(`/api/v1/posts/${id}`).then(res => res.data).catch(() => null)
+          api.get(`/api/v1/posts/${id}${user?.id ? `?userId=${user.id}` : ''}`).then(res => res.data).catch(() => null)
         );
         const fetchedPosts = (await Promise.all(postPromises)).filter(Boolean);
 
         setPosts(prev => (pageNum === 0 ? fetchedPosts : [...prev, ...fetchedPosts]));
       } else if (pageNum === 0) {
         // Fallback: fetch user's own posts if feed is empty
-        const userPostsRes = await api.get(`/api/v1/posts/user/${user.id}`);
+        const userPostsRes = await api.get(`/api/v1/posts/user/${user.id}${user?.id ? `?currentUserId=${user.id}` : ''}`);
         setPosts(userPostsRes.data || []);
         setHasMore(false);
       }
@@ -55,7 +55,7 @@ export default function HomePage() {
       console.error('Failed to load feed page', pageNum, err);
       if (pageNum === 0) {
         try {
-          const userPostsRes = await api.get(`/api/v1/posts/user/${user.id}`);
+          const userPostsRes = await api.get(`/api/v1/posts/user/${user.id}${user?.id ? `?currentUserId=${user.id}` : ''}`);
           setPosts(userPostsRes.data || []);
         } catch (fallbackErr) {
           console.error('Failed fallback post fetch', fallbackErr);

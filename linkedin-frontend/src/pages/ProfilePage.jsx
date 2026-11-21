@@ -61,7 +61,7 @@ export default function ProfilePage() {
       setProfile(profileData);
 
       // 2. Get User Posts: GET /api/v1/posts/user/{resolvedUserId}
-      const postsRes = await api.get(`/api/v1/posts/user/${resolvedUserId}`);
+      const postsRes = await api.get(`/api/v1/posts/user/${resolvedUserId}${user?.id ? `?currentUserId=${user.id}` : ''}`);
       setUserPosts(postsRes.data || []);
 
       // 3. Fetch Target User's Connections list for actual count & modal

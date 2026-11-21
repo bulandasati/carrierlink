@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/posts")
@@ -34,20 +35,22 @@ public class PostController {
 
     @GetMapping("/{postId}")
     public ResponseEntity<Post> getPost(
-            @PathVariable String postId){
+            @PathVariable String postId,
+            @RequestParam(required = false) String userId){
 
-        return ResponseEntity.ok(postService.getPost(postId));
+        return ResponseEntity.ok(postService.getPost(postId, userId));
     }
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<List<Post>> getUserPosts(
-            @PathVariable String userId){
+            @PathVariable String userId,
+            @RequestParam(required = false) String currentUserId){
 
-        return ResponseEntity.ok(postService.getUserPosts(userId));
+        return ResponseEntity.ok(postService.getUserPosts(userId, currentUserId));
     }
 
     @PostMapping("/{postId}/like")
-    public ResponseEntity<String> likePost(
+    public ResponseEntity<Map<String, Object>> likePost(
             @PathVariable String postId,
             @RequestParam String userId){
 

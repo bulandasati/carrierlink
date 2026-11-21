@@ -24,7 +24,7 @@ public class NotificationService {
     @Autowired(required = false)
     private JavaMailSender mailSender;
 
-    @Value("${spring.mail.from:bulandasati06@gmail.com}")
+    @Value("${spring.mail.from:bu123land@gmail.com}")
     private String mailFrom;
 
     /**

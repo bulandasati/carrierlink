@@ -31,6 +31,9 @@ public class Post {
     private int likeCount;
     private int commentCount;
 
+    @Transient
+    private boolean isLiked;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 

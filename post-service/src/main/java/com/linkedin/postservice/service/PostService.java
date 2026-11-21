@@ -83,9 +83,21 @@ public class PostService {
                 ));
     }
 
-    public List<Post> getUserPosts(String userId){
-        return postRepository
+    public Post getPost(String postId, String userId){
+        Post post = getPost(postId);
+        if(userId != null && !userId.isBlank()){
+            post.setLiked(likeRepository.existsByPostIdAndUserId(postId, userId));
+        }
+        return post;
+    }
+
+    public List<Post> getUserPosts(String userId, String currentUserId){
+        List<Post> posts = postRepository
                 .findByAuthorIdOrderByCreatedAtDesc(userId);
+        if(currentUserId != null && !currentUserId.isBlank()){
+            posts.forEach(p -> p.setLiked(likeRepository.existsByPostIdAndUserId(p.getId(), currentUserId)));
+        }
+        return posts;
     }
 
     /**
@@ -94,38 +106,46 @@ public class PostService {
      * @param userId
      * @return
      */
-    public String likePost(String postId, String userId){
+    public Map<String, Object> likePost(String postId, String userId){
 
         Post post = getPost(postId);
+        boolean isLiked;
 
         if(likeRepository.existsByPostIdAndUserId(postId, userId)){
 
             // Unlike
             likeRepository.findByPostIdAndUserId(postId, userId)
                     .ifPresent(likeRepository::delete);
-            post.setLikeCount(post.getLikeCount() - 1);
+            post.setLikeCount(Math.max(0, post.getLikeCount() - 1));
             postRepository.save(post);
-            return "Post unliked";
+            isLiked = false;
+        } else {
+
+            // Like
+            Like like = new Like();
+            like.setPostId(postId);
+            like.setUserId(userId);
+            likeRepository.save(like);
+            post.setLikeCount(post.getLikeCount() + 1);
+            postRepository.save(post);
+
+            // Publish post.liked event
+
+            Map<String, Object> postLikedEvent = new HashMap<>();
+            postLikedEvent.put("postId", postId);
+            postLikedEvent.put("userId", userId);
+            postLikedEvent.put("authorId", post.getAuthorId());
+
+            kafkaTemplate.send(POST_LIKED_TOPIC, postId, postLikedEvent);
+            isLiked = true;
         }
 
-        // Like
-        Like like = new Like();
-        like.setPostId(postId);
-        like.setUserId(userId);
-        likeRepository.save(like);
-        post.setLikeCount(post.getLikeCount() + 1);
-        postRepository.save(post);
-
-        // Publish post.liked event
-
-        Map<String, Object> postLikedEvent = new HashMap<>();
-        postLikedEvent.put("postId", postId);
-        postLikedEvent.put("userId", userId);
-        postLikedEvent.put("authorId", post.getAuthorId());
-
-        kafkaTemplate.send(POST_LIKED_TOPIC, postId, postLikedEvent);
-
-        return "Post liked";
+        Map<String, Object> response = new HashMap<>();
+        response.put("liked", isLiked);
+        response.put("likeCount", post.getLikeCount());
+        response.put("commentCount", post.getCommentCount());
+        response.put("message", isLiked ? "Post liked" : "Post unliked");
+        return response;
     }
 
     /**

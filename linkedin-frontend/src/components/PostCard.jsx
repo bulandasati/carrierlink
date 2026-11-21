@@ -8,7 +8,7 @@ import { ThumbsUp, MessageSquare, Trash2, Send } from 'lucide-react';
 export default function PostCard({ post, onDelete }) {
   const { user } = useAuth();
   const [author, setAuthor] = useState(null);
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(Boolean(post.isLiked));
   const [likeCount, setLikeCount] = useState(post.likeCount || 0);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
@@ -20,12 +20,15 @@ export default function PostCard({ post, onDelete }) {
   const [commentAuthorsMap, setCommentAuthorsMap] = useState({});
 
   useEffect(() => {
+    if (typeof post.isLiked === 'boolean') {
+      setLiked(post.isLiked);
+    }
     setLikeCount(post.likeCount || 0);
     setCommentCount(post.commentCount || 0);
-  }, [post.likeCount, post.commentCount]);
+  }, [post.isLiked, post.likeCount, post.commentCount]);
 
   useEffect(() => {
-    if (post.id && user?.id) {
+    if (post.id && user?.id && post.isLiked === undefined) {
       api.get(`/api/v1/posts/${post.id}/liked?userId=${user.id}`)
         .then(res => {
           if (typeof res.data === 'boolean') {
@@ -34,7 +37,7 @@ export default function PostCard({ post, onDelete }) {
         })
         .catch(() => {});
     }
-  }, [post.id, user?.id]);
+  }, [post.id, user?.id, post.isLiked]);
 
   useEffect(() => {
     if (post.authorId) {
@@ -73,15 +76,18 @@ export default function PostCard({ post, onDelete }) {
     try {
       const res = await api.post(`/api/v1/posts/${post.id}/like?userId=${user.id}`);
       const data = res.data;
-      const isUnliked = (typeof data === 'string' && data.toLowerCase().includes('unliked')) ||
-                        (data && data.liked === false);
 
-      if (isUnliked) {
-        setLiked(false);
-        setLikeCount(prev => Math.max(0, prev - 1));
+      if (data && typeof data === 'object') {
+        if (typeof data.liked === 'boolean') {
+          setLiked(data.liked);
+        }
+        if (typeof data.likeCount === 'number') {
+          setLikeCount(data.likeCount);
+        }
       } else {
-        setLiked(true);
-        setLikeCount(prev => prev + 1);
+        const isUnliked = typeof data === 'string' && data.toLowerCase().includes('unliked');
+        setLiked(!isUnliked);
+        setLikeCount(prev => isUnliked ? Math.max(0, prev - 1) : prev + 1);
       }
     } catch (err) {
       console.error('Failed to like post', err);

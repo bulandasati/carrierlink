@@ -6,7 +6,7 @@ spring:
     port: ${SPRING_MAIL_PORT:2525}
     username: ${SPRING_MAIL_USERNAME}
     password: ${SPRING_MAIL_PASSWORD}
-    from: ${SPRING_MAIL_FROM:bulandasati06@gmail.com}
+    from: ${SPRING_MAIL_FROM:bu123land@gmail.com}
     properties:
       mail:
         smtp:
