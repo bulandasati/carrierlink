@@ -43,6 +43,13 @@ public class OpenSearchHeaderConfig {
                 }
             });
 
+            httpClientBuilder.addInterceptorFirst(new org.apache.http.HttpResponseInterceptor() {
+                @Override
+                public void process(org.apache.http.HttpResponse response, HttpContext context) {
+                    response.setHeader("X-Elastic-Product", "Elasticsearch");
+                }
+            });
+
             return httpClientBuilder;
         });
     }
