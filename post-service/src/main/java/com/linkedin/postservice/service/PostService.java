@@ -129,6 +129,13 @@ public class PostService {
     }
 
     /**
+     * Check if a user has liked a post.
+     */
+    public boolean isPostLiked(String postId, String userId){
+        return likeRepository.existsByPostIdAndUserId(postId, userId);
+    }
+
+    /**
      * Add comment to post.
      */
 

@@ -54,6 +54,14 @@ public class PostController {
         return ResponseEntity.ok(postService.likePost(postId, userId));
     }
 
+    @GetMapping("/{postId}/liked")
+    public ResponseEntity<Boolean> isPostLiked(
+            @PathVariable String postId,
+            @RequestParam String userId){
+
+        return ResponseEntity.ok(postService.isPostLiked(postId, userId));
+    }
+
     @PostMapping("/{postId}/comments")
     public ResponseEntity<Comment> addComment(
             @PathVariable String postId,

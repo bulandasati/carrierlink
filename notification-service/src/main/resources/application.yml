@@ -3,9 +3,10 @@ spring:
     name: notification-service
   mail:
     host: ${SPRING_MAIL_HOST:smtp-relay.brevo.com}
-    port: ${SPRING_MAIL_PORT:587}
+    port: ${SPRING_MAIL_PORT:2525}
     username: ${SPRING_MAIL_USERNAME}
     password: ${SPRING_MAIL_PASSWORD}
+    from: ${SPRING_MAIL_FROM:bulandasati06@gmail.com}
     properties:
       mail:
         smtp:

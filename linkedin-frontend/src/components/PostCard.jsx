@@ -15,8 +15,26 @@ export default function PostCard({ post, onDelete }) {
   const [commentText, setCommentText] = useState('');
   const [commentCount, setCommentCount] = useState(post.commentCount || 0);
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
 
   const [commentAuthorsMap, setCommentAuthorsMap] = useState({});
+
+  useEffect(() => {
+    setLikeCount(post.likeCount || 0);
+    setCommentCount(post.commentCount || 0);
+  }, [post.likeCount, post.commentCount]);
+
+  useEffect(() => {
+    if (post.id && user?.id) {
+      api.get(`/api/v1/posts/${post.id}/liked?userId=${user.id}`)
+        .then(res => {
+          if (typeof res.data === 'boolean') {
+            setLiked(res.data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [post.id, user?.id]);
 
   useEffect(() => {
     if (post.authorId) {
@@ -50,9 +68,15 @@ export default function PostCard({ post, onDelete }) {
   };
 
   const handleLike = async () => {
+    if (!user?.id || isLiking) return;
+    setIsLiking(true);
     try {
-      await api.post(`/api/v1/posts/${post.id}/like?userId=${user.id}`);
-      if (liked) {
+      const res = await api.post(`/api/v1/posts/${post.id}/like?userId=${user.id}`);
+      const data = res.data;
+      const isUnliked = (typeof data === 'string' && data.toLowerCase().includes('unliked')) ||
+                        (data && data.liked === false);
+
+      if (isUnliked) {
         setLiked(false);
         setLikeCount(prev => Math.max(0, prev - 1));
       } else {
@@ -61,6 +85,8 @@ export default function PostCard({ post, onDelete }) {
       }
     } catch (err) {
       console.error('Failed to like post', err);
+    } finally {
+      setIsLiking(false);
     }
   };
 
@@ -70,6 +96,7 @@ export default function PostCard({ post, onDelete }) {
         const res = await api.get(`/api/v1/posts/${post.id}/comments`);
         const commentsList = res.data || [];
         setComments(commentsList);
+        setCommentCount(commentsList.length);
         fetchCommentAuthors(commentsList);
       } catch (err) {
         console.error('Failed to fetch comments', err);
