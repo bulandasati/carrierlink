@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,12 +36,12 @@ public class UserService {
 
     public String sendConnectionRequest(String receiverId, String requesterId){
 
-        if (connectionRepository.existsByRequesterIdAndReceiverId(
-                requesterId, receiverId)){
+        if (receiverId.equals(requesterId)) {
+            throw new RuntimeException("Cannot connect with yourself");
+        }
 
-            throw new RuntimeException(
-                    "Connection request already sent"
-            );
+        if (connectionRepository.existsConnectionBetween(requesterId, receiverId)){
+            throw new RuntimeException("A connection or request already exists between these users");
         }
 
         Connection connection = new Connection();
@@ -104,6 +105,23 @@ public class UserService {
                     return getUserProfile(otherUserId);
                 })
                 .collect(Collectors.toList());
+    }
+
+    public Map<String, Object> getConnectionStatus(String targetUserId, String currentUserId){
+        Map<String, Object> map = new HashMap<>();
+        if (targetUserId.equals(currentUserId)) {
+            map.put("status", "SELF");
+            return map;
+        }
+        Optional<Connection> conn = connectionRepository.findConnectionBetween(targetUserId, currentUserId);
+        if (conn.isPresent()) {
+            map.put("status", conn.get().getStatus().name());
+            map.put("requesterId", conn.get().getRequesterId());
+            map.put("connectionId", conn.get().getId());
+        } else {
+            map.put("status", "NOT_CONNECTED");
+        }
+        return map;
     }
 
     public List<UserResponse> getAllUsers(String requestingUserId) {

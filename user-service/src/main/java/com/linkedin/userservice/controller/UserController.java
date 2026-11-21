@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -122,5 +123,13 @@ public class UserController {
             @PathVariable String userId){
         return ResponseEntity.ok(
                 userService.getConnections(userId));
+    }
+
+    @GetMapping("/{userId}/connection-status")
+    public ResponseEntity<Map<String, Object>> getConnectionStatus(
+            @PathVariable String userId,
+            @RequestParam String currentUserId){
+        return ResponseEntity.ok(
+                userService.getConnectionStatus(userId, currentUserId));
     }
 }

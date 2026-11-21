@@ -75,24 +75,30 @@ export default function ProfilePage() {
       // 3. Fetch Connection Status if not own profile
       if (currentUser?.id && profileData.id !== currentUser.id) {
         try {
-          const connectionsRes = await api.get(`/api/v1/users/${currentUser.id}/connections`);
-          const isConnected = (connectionsRes.data || []).some(u => u.id === profileData.id);
-
-          if (isConnected) {
-            setConnectionStatus('CONNECTED');
-          } else {
-            const pendingRes = await api.get(`/api/v1/users/${currentUser.id}/connections/pending`);
-            const isPending = (pendingRes.data || []).some(
-              c => c.requesterId === profileData.id || c.receiverId === profileData.id
-            );
-            if (isPending) {
-              setConnectionStatus('PENDING');
-            } else {
-              setConnectionStatus('NOT_CONNECTED');
-            }
+          const statusRes = await api.get(
+            `/api/v1/users/${profileData.id}/connection-status?currentUserId=${currentUser.id}`
+          );
+          if (statusRes.data?.status) {
+            setConnectionStatus(statusRes.data.status);
           }
         } catch (connErr) {
-          console.error('Failed to check connection status', connErr);
+          // Fallback to legacy check
+          try {
+            const connectionsRes = await api.get(`/api/v1/users/${currentUser.id}/connections`);
+            const isConnected = (connectionsRes.data || []).some(u => u.id === profileData.id);
+
+            if (isConnected) {
+              setConnectionStatus('CONNECTED');
+            } else {
+              const pendingRes = await api.get(`/api/v1/users/${currentUser.id}/connections/pending`);
+              const isPending = (pendingRes.data || []).some(
+                c => c.requesterId === profileData.id || c.receiverId === profileData.id
+              );
+              setConnectionStatus(isPending ? 'PENDING' : 'NOT_CONNECTED');
+            }
+          } catch (legacyErr) {
+            console.error('Failed to check connection status', legacyErr);
+          }
         }
       }
     } catch (err) {
@@ -104,7 +110,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     fetchProfileData();
-  }, [identifier, location.state?.userId]);
+  }, [identifier, location.state?.userId, currentUser?.id]);
 
   const targetUserId = profile?.id || location.state?.userId || currentUser?.id;
   const isOwnProfile = currentUser?.id === targetUserId;
