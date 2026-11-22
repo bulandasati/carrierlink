@@ -3,6 +3,10 @@ RENDER_ENVIRONMENT_VARIABLES.md
 *.env
 *.env.local
 
+# API Documentation
+*.html
+*api_doc*
+
 # Maven build artifacts
 **/target/
 *.jar
