@@ -49,7 +49,11 @@ export default function CreatePostBox({ onPostCreated }) {
         formData.append('content', content);
         formData.append('imageUrl', uploadedImageUrl);
 
-        response = await api.post('/api/v1/posts', formData);
+        response = await api.post('/api/v1/posts', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
       } else {
         // Fallback: standard backend multipart/form-data upload
         const formData = new FormData();
