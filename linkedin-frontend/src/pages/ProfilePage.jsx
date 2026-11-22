@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { uploadAvatarViaPresignedUrl } from '../services/s3UploadService';
 import EditProfileModal from '../components/EditProfileModal';
 import ConnectionsModal from '../components/ConnectionsModal';
 import PostCard from '../components/PostCard';
@@ -121,17 +122,9 @@ export default function ProfilePage() {
 
     setUploadingPhoto(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // Upload Profile Photo: POST /api/v1/users/{targetUserId}/profile-photo
-      const res = await api.post(`/api/v1/users/${targetUserId}/profile-photo`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      setProfile(res.data);
+      // Direct S3 Pre-signed URL upload (with automatic backend fallback)
+      const updatedUser = await uploadAvatarViaPresignedUrl(targetUserId, file);
+      setProfile(updatedUser);
     } catch (err) {
       console.error('Failed to upload profile photo', err);
       alert(err.response?.data?.message || 'Failed to upload photo.');

@@ -1,5 +1,9 @@
 package com.linkedin.postservice.service;
 
+import com.linkedin.postservice.dto.MultipartCompleteRequest;
+import com.linkedin.postservice.dto.MultipartInitiateResponse;
+import com.linkedin.postservice.dto.MultipartPartPresignedResponse;
+import com.linkedin.postservice.dto.PresignedUrlResponse;
 import com.linkedin.postservice.entity.Comment;
 import com.linkedin.postservice.entity.Like;
 import com.linkedin.postservice.entity.Post;
@@ -44,6 +48,13 @@ public class PostService {
     public Post createPost(String authorId,
                            String content,
                            MultipartFile image){
+        return createPost(authorId, content, null, image);
+    }
+
+    public Post createPost(String authorId,
+                           String content,
+                           String imageUrl,
+                           MultipartFile image){
 
         log.info("Creating post for user: {}", authorId);
 
@@ -51,18 +62,19 @@ public class PostService {
         post.setAuthorId(authorId);
         post.setContent(content);
 
-        if(image != null && !image.isEmpty()){
-            String imageUrl = s3Service.uploadFile(
-                    image, "posts/" + authorId);
-
+        // Pre-signed URL or direct URL takes precedence (bypasses server file-transfer)
+        if(imageUrl != null && !imageUrl.isBlank()){
             post.setImageUrl(imageUrl);
+        } else if(image != null && !image.isEmpty()){
+            String uploadedUrl = s3Service.uploadFile(
+                    image, "posts/" + authorId);
+            post.setImageUrl(uploadedUrl);
         }
 
         Post savedPost = postRepository.save(post);
         log.info("Post created: {}", savedPost.getId());
 
         // Publish to kafka - Feed Service and Search service consume this
-
         Map<String, Object> postCreatedEvent = new HashMap<>();
         postCreatedEvent.put("postId", savedPost.getId());
         postCreatedEvent.put("authorId", savedPost.getAuthorId());
@@ -74,6 +86,26 @@ public class PostService {
 
         log.info("post.created event published: {}", savedPost.getId());
         return savedPost;
+    }
+
+    public PresignedUrlResponse generatePresignedUploadUrl(String authorId, String fileName, String contentType) {
+        return s3Service.generatePresignedUploadUrl("posts/" + authorId, fileName, contentType);
+    }
+
+    public MultipartInitiateResponse initiateMultipartUpload(String authorId, String fileName, String contentType) {
+        return s3Service.initiateMultipartUpload("posts/" + authorId, fileName, contentType);
+    }
+
+    public MultipartPartPresignedResponse generatePresignedPartUploadUrl(String key, String uploadId, int partNumber) {
+        return s3Service.generatePresignedPartUploadUrl(key, uploadId, partNumber);
+    }
+
+    public String completeMultipartUpload(String key, String uploadId, List<MultipartCompleteRequest.PartInfo> parts) {
+        return s3Service.completeMultipartUpload(key, uploadId, parts);
+    }
+
+    public void abortMultipartUpload(String key, String uploadId) {
+        s3Service.abortMultipartUpload(key, uploadId);
     }
 
     public Post getPost(String postId){

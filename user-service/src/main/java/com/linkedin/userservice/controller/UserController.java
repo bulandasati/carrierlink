@@ -1,5 +1,6 @@
 package com.linkedin.userservice.controller;
 
+import com.linkedin.userservice.dto.PresignedUrlResponse;
 import com.linkedin.userservice.dto.UserResponse;
 import com.linkedin.userservice.entity.Connection;
 import com.linkedin.userservice.service.UserService;
@@ -80,6 +81,46 @@ public class UserController {
         return ResponseEntity.ok(
                 userService.uploadProfilePhoto(userId, file));
 
+    }
+
+    /**
+     * Generate pre-signed URL for direct browser-to-S3 avatar upload
+     */
+    @GetMapping("/{userId}/avatar/presigned-url")
+    public ResponseEntity<PresignedUrlResponse> getAvatarPresignedUrl(
+            @PathVariable String userId,
+            @RequestHeader("X-User-Id") String requestingUserId,
+            @RequestParam(defaultValue = "avatar.jpg") String fileName,
+            @RequestParam(defaultValue = "image/jpeg") String contentType) {
+
+        if (!userId.equals(requestingUserId)) {
+            return ResponseEntity.status(403).build();
+        }
+
+        return ResponseEntity.ok(
+                userService.getAvatarPresignedUrl(userId, fileName, contentType));
+    }
+
+    /**
+     * Confirm avatar upload after client directly uploads to S3
+     */
+    @PutMapping("/{userId}/avatar/confirm")
+    public ResponseEntity<UserResponse> confirmAvatarUpload(
+            @PathVariable String userId,
+            @RequestHeader("X-User-Id") String requestingUserId,
+            @RequestBody Map<String, String> request) {
+
+        if (!userId.equals(requestingUserId)) {
+            return ResponseEntity.status(403).build();
+        }
+
+        String photoUrl = request.get("photoUrl");
+        if (photoUrl == null || photoUrl.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        return ResponseEntity.ok(
+                userService.updateProfilePhotoUrl(userId, photoUrl));
     }
 
     /**

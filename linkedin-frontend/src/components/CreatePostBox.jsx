@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { uploadPostAttachmentViaS3 } from '../services/s3UploadService';
 import { Image, X, Send } from 'lucide-react';
 
 export default function CreatePostBox({ onPostCreated }) {
@@ -33,18 +34,37 @@ export default function CreatePostBox({ onPostCreated }) {
     setError('');
 
     try {
-      const formData = new FormData();
-      formData.append('authorId', user?.id || '');
-      formData.append('content', content);
+      let uploadedImageUrl = null;
+
+      // If an image is selected, attempt S3 Pre-signed / Multipart upload
       if (imageFile) {
-        formData.append('image', imageFile);
+        uploadedImageUrl = await uploadPostAttachmentViaS3(user?.id || 'anonymous', imageFile);
       }
 
-      const response = await api.post('/api/v1/posts', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      let response;
+      if (uploadedImageUrl) {
+        // Direct S3 URL: post metadata created without proxying file bytes through backend
+        const formData = new FormData();
+        formData.append('authorId', user?.id || '');
+        formData.append('content', content);
+        formData.append('imageUrl', uploadedImageUrl);
+
+        response = await api.post('/api/v1/posts', formData);
+      } else {
+        // Fallback: standard backend multipart/form-data upload
+        const formData = new FormData();
+        formData.append('authorId', user?.id || '');
+        formData.append('content', content);
+        if (imageFile) {
+          formData.append('image', imageFile);
+        }
+
+        response = await api.post('/api/v1/posts', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      }
 
       setContent('');
       removeImage();

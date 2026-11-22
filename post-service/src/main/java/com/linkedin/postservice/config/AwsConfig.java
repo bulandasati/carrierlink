@@ -31,4 +31,14 @@ public class AwsConfig {
                 .build();
     }
 
+    @Bean
+    public software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner() {
+        return software.amazon.awssdk.services.s3.presigner.S3Presigner.builder()
+                .region(Region.of(region))
+                .credentialsProvider(
+                        StaticCredentialsProvider.create(
+                                AwsBasicCredentials.create(
+                                        accessKey, secretKey)))
+                .build();
+    }
 }

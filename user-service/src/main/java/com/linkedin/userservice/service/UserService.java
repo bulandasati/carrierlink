@@ -1,5 +1,6 @@
 package com.linkedin.userservice.service;
 
+import com.linkedin.userservice.dto.PresignedUrlResponse;
 import com.linkedin.userservice.dto.UserResponse;
 import com.linkedin.userservice.entity.Connection;
 import com.linkedin.userservice.entity.ConnectionStatus;
@@ -195,6 +196,34 @@ public class UserService {
         log.info("Profile photo uploaded for user: {}", userId);
         return mapToResponse(savedUser);
 
+    }
+
+    public PresignedUrlResponse getAvatarPresignedUrl(String userId, String fileName, String contentType) {
+        log.info("Generating avatar presigned URL for user: {}", userId);
+        return s3Service.generatePresignedUploadUrl("profiles/" + userId + "/avatar", fileName, contentType);
+    }
+
+    public UserResponse updateProfilePhotoUrl(String userId, String photoUrl) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+        user.setProfilePhotoUrl(photoUrl);
+        User savedUser = userRepository.save(user);
+
+        // Publish to Kafka so Search Service stays in sync
+        Map<String, Object> userUpdatedEvent = new HashMap<>();
+        userUpdatedEvent.put("userId", savedUser.getId());
+        userUpdatedEvent.put("firstName", savedUser.getFirstName());
+        userUpdatedEvent.put("lastName", savedUser.getLastName());
+        userUpdatedEvent.put("headline", savedUser.getHeadline());
+        userUpdatedEvent.put("about", savedUser.getAbout());
+        userUpdatedEvent.put("location", savedUser.getLocation());
+        userUpdatedEvent.put("profilePhotoUrl", savedUser.getProfilePhotoUrl());
+        userUpdatedEvent.put("coverPhotoUrl", savedUser.getCoverPhotoUrl());
+
+        kafkaTemplate.send(USER_UPDATED_TOPIC, savedUser.getId(), userUpdatedEvent);
+        log.info("Avatar updated via pre-signed URL confirmation for user: {}", userId);
+        return mapToResponse(savedUser);
     }
 
     private UserResponse mapToResponse(User user){
