@@ -42,7 +42,12 @@ public class PostController {
             @PathVariable String postId,
             @RequestParam(required = false) String userId){
 
-        return ResponseEntity.ok(postService.getPost(postId, userId));
+        try {
+            return ResponseEntity.ok(postService.getPost(postId, userId));
+        } catch (RuntimeException e) {
+            log.warn("Post not found: {}", postId);
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @GetMapping("/user/{userId}")
